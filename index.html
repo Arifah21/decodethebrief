@@ -6,10 +6,16 @@
     <title>Semiotica: Decode the Brief</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
         canvas { touch-action: none; } /* Mencegah scrolling saat drag di mobile */
+        
+        /* Custom scrollbar untuk panel UI yang elegan */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
     </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 h-screen overflow-hidden flex flex-col">
@@ -23,6 +29,10 @@
             <h1 class="text-xl font-bold tracking-tight">Semiotica <span class="text-zinc-500 font-normal text-sm ml-2 hidden sm:inline-block">| Decode the Brief</span></h1>
         </div>
         <div class="flex gap-4 items-center">
+            <button id="mute-btn" onclick="window.toggleMute()" class="w-8 h-8 flex items-center justify-center rounded-full bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 transition-colors border border-indigo-500/30" title="Bungkam Audio">
+                <i id="mute-icon" class="fa-solid fa-volume-high text-xs"></i>
+            </button>
+            
             <div class="text-sm px-3 py-1 bg-zinc-800 rounded-full border border-zinc-700 font-medium text-amber-400" id="total-score-badge">
                 <i class="fa-solid fa-star mr-1"></i> Total: 0
             </div>
@@ -140,7 +150,18 @@
                 S
             </div>
             <h1 class="text-3xl font-black tracking-tight mb-2">Semiotica</h1>
-            <p class="text-zinc-400 text-sm mb-8">Uji insting desain dan pemahaman Anda terhadap <i>brief</i> klien.</p>
+            <p class="text-zinc-400 text-sm mb-6">Uji insting desain dan pemahaman Anda terhadap <i>brief</i> klien.</p>
+            
+            <!-- Area Mini Leaderboard Layar Awal -->
+            <div class="mb-6 bg-zinc-950/50 rounded-xl p-4 border border-zinc-800 text-left">
+                <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-trophy text-yellow-500 mr-1"></i> Top Agencies</span>
+                    <span class="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded font-bold tracking-widest">GLOBAL</span>
+                </h3>
+                <div id="intro-leaderboard-list" class="space-y-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                    <div class="text-center text-zinc-600 text-xs py-2 animate-pulse">Memuat data cloud...</div>
+                </div>
+            </div>
             
             <div class="text-left mb-6">
                 <label class="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Nama Anda / Agency:</label>
@@ -235,11 +256,14 @@
                     scores.sort((a, b) => b.score - a.score);
                     window.cloudLeaderboard = scores;
                     
-                    // Jika layar klasemen sedang terbuka, perbarui UI seketika (Real-Time)
+                    // Perbarui layar akhir jika sedang terbuka
                     if (!document.getElementById('leaderboard-modal').classList.contains('hidden')) {
-                        if(typeof window.renderLeaderboardUI === 'function') {
-                            window.renderLeaderboardUI();
-                        }
+                        if(typeof window.renderLeaderboardUI === 'function') window.renderLeaderboardUI();
+                    }
+                    
+                    // Perbarui layar Intro jika sedang terbuka
+                    if (!document.getElementById('intro-modal').classList.contains('hidden')) {
+                        if(typeof window.renderIntroLeaderboardUI === 'function') window.renderIntroLeaderboardUI();
                     }
                 }, (error) => {
                     console.error("Firebase Snapshot Error:", error);
@@ -290,6 +314,58 @@
             { name: "RGB Agency", score: 650 },
             { name: "Pemula Design", score: 400 }
         ];
+
+        // --- STREAMING_CHUNK:Sistem Procedural Audio BGM (Tone.js) ---
+        let bgmSynth;
+        let bgmSequence;
+        let isBgmInitialized = false;
+
+        window.initBGM = async function() {
+            if (isBgmInitialized) return;
+            
+            // Tone.js harus dimulai setelah ada interaksi pengguna (aturan browser)
+            await Tone.start();
+            
+            // Setel volume keseluruhan (agar tidak terlalu keras/mengganggu)
+            Tone.Destination.volume.value = -15;
+
+            // Membuat suara synth ala cyberpunk / techno bass
+            bgmSynth = new Tone.MonoSynth({
+                oscillator: { type: "sawtooth" },
+                envelope: { attack: 0.02, decay: 0.1, sustain: 0.1, release: 0.8 },
+                filter: { type: "lowpass", rolloff: -24, Q: 1.5 },
+                filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.5, baseFrequency: 200, octaves: 4 }
+            }).toDestination();
+
+            // Pola nada kompetitif (berulang, tense, ala timer countdown)
+            const notes = ["C2", "C2", "D#2", "C2", "F2", "C2", "G2", "C2"];
+            
+            bgmSequence = new Tone.Sequence((time, note) => {
+                bgmSynth.triggerAttackRelease(note, "16n", time);
+            }, notes, "8n"); // Kecepatan pola
+
+            Tone.Transport.bpm.value = 130; // Tempo adrenalin (130 BPM)
+            
+            bgmSequence.start(0);
+            Tone.Transport.start();
+            isBgmInitialized = true;
+        };
+
+        window.toggleMute = function() {
+            const muteBtn = document.getElementById('mute-btn');
+            const icon = document.getElementById('mute-icon');
+            
+            // Toggle mute pada output utama Tone.js
+            Tone.Destination.mute = !Tone.Destination.mute;
+            
+            if (Tone.Destination.mute) {
+                icon.className = "fa-solid fa-volume-xmark text-xs";
+                muteBtn.className = "w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-500 hover:bg-zinc-700 transition-colors border border-zinc-700";
+            } else {
+                icon.className = "fa-solid fa-volume-high text-xs";
+                muteBtn.className = "w-8 h-8 flex items-center justify-center rounded-full bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 transition-colors border border-indigo-500/30";
+            }
+        };
 
         class Shape {
             constructor(type, x, y) {
@@ -483,7 +559,7 @@
         // Pendaftaran Fungsi Global (Window) untuk Event Handler UI ---
         // Semua fungsi UI ditempelkan ke 'window' agar tidak terjadi ReferenceError
         
-        window.startGame = function() {
+        window.startGame = async function() {
             const inputName = document.getElementById('player-name-input').value.trim();
             if (inputName) {
                 playerName = inputName;
@@ -491,6 +567,10 @@
             totalScore = 0;
             document.getElementById('total-score-badge').innerHTML = `<i class="fa-solid fa-star mr-1"></i> Total: ${totalScore}`;
             document.getElementById('intro-modal').classList.add('hidden');
+            
+            // Menyalakan Audio BGM
+            await window.initBGM();
+
             loadLevel(0);
         };
 
@@ -565,6 +645,37 @@
                 `;
             });
             document.getElementById('leaderboard-list').innerHTML = listHTML;
+        };
+
+        // Fungsi baru untuk render leaderboard mini di layar Intro
+        window.renderIntroLeaderboardUI = function() {
+            let dataToRender = window.isFirebaseReady && window.cloudLeaderboard.length > 0 
+                                ? window.cloudLeaderboard 
+                                : inMemoryLeaderboard;
+            
+            // Ambil 5 peringkat teratas saja
+            const top5 = dataToRender.slice(0, 5);
+            let listHTML = '';
+
+            if (top5.length === 0) {
+                listHTML = '<div class="text-center text-zinc-600 text-xs py-2">Belum ada data. Jadilah yang pertama!</div>';
+            } else {
+                top5.forEach((entry, idx) => {
+                    const tier = getTierInfo(entry.score);
+                    listHTML += `
+                        <div class="flex items-center justify-between text-sm p-2 rounded bg-zinc-900 border border-zinc-800">
+                            <div class="flex items-center gap-2 truncate">
+                                <span class="text-zinc-500 font-bold w-4 text-right">${idx + 1}.</span>
+                                <span class="text-zinc-300 truncate"><i class="fa-solid ${tier.icon} ${tier.color} text-[10px] mr-1"></i> ${entry.name}</span>
+                            </div>
+                            <div class="font-bold font-mono ${tier.color}">${entry.score}</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            const container = document.getElementById('intro-leaderboard-list');
+            if (container) container.innerHTML = listHTML;
         };
 
         window.addShape = function(type) {
@@ -675,6 +786,7 @@
             inMemoryLeaderboard = inMemoryLeaderboard.filter(entry => !entry.isPlayer);
             
             document.getElementById('intro-modal').classList.remove('hidden');
+            window.renderIntroLeaderboardUI(); // Render ulang data di halaman utama
         };
 
         
@@ -734,6 +846,7 @@
             resizeCanvas();
             // Tampilkan layar input nama sebelum mulai
             document.getElementById('intro-modal').classList.remove('hidden');
+            window.renderIntroLeaderboardUI(); // Load data dummy jika offline, atau tunggu cloud
         };
 
     </script>
