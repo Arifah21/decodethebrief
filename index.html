@@ -110,11 +110,18 @@
 
         <!-- Canvas Area -->
         <div class="flex-1 relative bg-zinc-950 overflow-hidden" id="canvas-container">
-            <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(#ffffff 1px, transparent 1px); background-size: 20px 20px;"></div>
-            <canvas id="gameCanvas" class="block w-full h-full cursor-crosshair"></canvas>
+            <!-- Background Image dengan Opacity Rendah -->
+            <div class="absolute inset-0 bg-center bg-cover bg-no-repeat opacity-20 pointer-events-none" 
+                 style="background-image: url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop');">
+            </div>
             
-            <div class="absolute bottom-4 right-4 text-xs text-zinc-600 pointer-events-none">
-                *Klik dan drag untuk memindahkan objek.
+            <!-- Grid Overlay -->
+            <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(#ffffff 1px, transparent 1px); background-size: 20px 20px;"></div>
+            
+            <canvas id="gameCanvas" class="block w-full h-full cursor-crosshair relative z-10"></canvas>
+            
+            <div class="absolute bottom-4 right-4 text-xs text-zinc-400 font-medium pointer-events-none bg-zinc-900/80 px-3 py-1.5 rounded-lg border border-zinc-700 backdrop-blur-sm z-20">
+                <i class="fa-solid fa-arrows-up-down-left-right mr-1"></i> Klik dan drag untuk memindahkan objek.
             </div>
         </div>
     </main>
